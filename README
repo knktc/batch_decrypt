@@ -1,0 +1,17 @@
+;##############################################################
+Batch_decrypt
+An autoit script for decrypting batch files encrypted by gnupg
+;##############################################################
+
+;#######
+Note
+;#######
+This my first git project!
+I want to use git to help me to record what I've done to my script.
+And I want to share this small script with others.
+(Sorry for my poor English...)
+
+;#######
+Usage
+;#######
+Sorry, this script is not finished yet, I will write this part soon.
