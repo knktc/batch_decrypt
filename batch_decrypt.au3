@@ -35,8 +35,13 @@ While 1
 		Case $msg = $GUI_EVENT_CLOSE
 			ExitLoop
 
-			
+		;点击“添加”按钮后选择需要解密的文件	
 		Case $msg = $Button_add_file
+			$add_file_path = FileOpenDialog("选择加密文件", @DesktopDir & "\", "加密文件 (*.asc; *.pgp) |所有文件 (*.*)", 1 + 2 + 4)
+			If $add_file_path <> "" Then
+				GUICtrlCreateListViewItem($add_file_path, $Listview_encrypt_files)
+				GUICtrlSendMsg($Listview_encrypt_files, $LVM_SETCOLUMNWIDTH, 0, -1)
+			EndIf
 		
 		;点击删除按钮后删除选中的文件
 		Case $msg = $Button_remove_file
