@@ -6,11 +6,23 @@
 #include <ListviewConstants.au3>
 #include <EditConstants.au3>
 #Include <GuiListView.au3>
+#include <File.au3>
 
 Global $DropFilesArr[1]
 
 GUICreate("批量解密工具", 473, 342, -1, -1, -1, $WS_EX_ACCEPTFILES)
 GUIRegisterMsg(0x233, "WM_DROPFILES_FUNC")
+
+;“设置”菜单
+$Menu_configure = GUICtrlCreateMenu("设置(&C)")
+$Menu_configure_gpgpath = GUICtrlCreateMenuItem("选择gpg.exe路径", $Menu_configure)
+$Menu_configure_import_keys = GUICtrlCreateMenuItem("导入密钥", $Menu_configure)
+$Menu_configure_separator1 = GUICtrlCreateMenuItem("", $Menu_configure)
+$Menu_configure_exit = GUICtrlCreateMenuItem("退出", $Menu_configure)
+
+;“帮助”菜单
+$Menu_help = GUICtrlCreateMenu("帮助(&H)")
+$Menu_help_about = GUICtrlCreateMenuItem("关于", $Menu_help)
 
 GUICtrlCreateLabel("添加需解密的文件", 20, 16)
 $Listview_encrypt_files = GUICtrlCreateListView("解密文件", 11, 33, 446, 150, -1, $WS_EX_CLIENTEDGE)
@@ -26,15 +38,38 @@ $Button_remove_file = GUICtrlCreateButton("删除", 141, 267, 75, 23)
 $Button_remove_all = GUICtrlCreateButton("清空", 249, 267, 75, 23)
 $Button_decrypt = GUICtrlCreateButton("解密", 369, 267, 75, 23)
 
+;配置文件路径
+$config_file_path = @WorkingDir & "\configure.ini"
+
+;启动时检查是否有配置文件，是否已指定gpg.exe的位置
+while 1	
+	If FileExists($config_file_path) = 0 Then
+		_FileCreate($config_file_path)
+		_ChooseGpgPath($config_file_path)
+	ElseIf IniRead($config_file_path, "batch_decrypt", "gpg_path" , "") = "" Then
+		_ChooseGpgPath($config_file_path)
+	Else
+		ExitLoop
+	EndIf
+WEnd
+
 
 GUISetState()
 
+;等待接受按键信息
 While 1
 	$msg = GUIGetMsg()
 	Select
+		;接收关闭信息
 		Case $msg = $GUI_EVENT_CLOSE
 			ExitLoop
-
+		Case $msg = $Menu_configure_exit
+			ExitLoop
+		
+		;点击“设置”按钮后配置gpg文件指向
+		Case $msg = $Menu_configure_gpgpath
+			_ChooseGpgPath($config_file_path)
+		
 		;点击“添加”按钮后选择需要解密的文件	
 		Case $msg = $Button_add_file
 			$add_file_path = FileOpenDialog("选择加密文件", @DesktopDir & "\", "加密文件 (*.asc; *.pgp) |所有文件 (*.*)", 1 + 2 + 4)
@@ -51,14 +86,16 @@ While 1
 		Case $msg = $Button_remove_all
 			_GUICtrlListView_DeleteAllItems($Listview_encrypt_files)
 		
+		;点击“解密”按钮后开始解密列表中所有文件
 		Case $msg = $Button_decrypt
-		$password = Call("_GetPassword")		
-		$file_count = _GUICtrlListView_GetItemCount($Listview_encrypt_files)
-		For $i = 0 To $file_count-1 
-			$input_filepath = _GUICtrlListView_GetItemText($Listview_encrypt_files, $i)
-			$output_filepath = _GetOutputFilepath($input_filepath)
-			_DecryptSingleFile($input_filepath, $output_filepath, $password)
-		Next
+			$password = Call("_GetPassword")		
+			$gpg_path = IniRead($config_file_path, "batch_decrypt", "gpg_path" , "")
+			$file_count = _GUICtrlListView_GetItemCount($Listview_encrypt_files)
+			For $i = 0 To $file_count-1 
+				$input_filepath = _GUICtrlListView_GetItemText($Listview_encrypt_files, $i)
+				$output_filepath = _GetOutputFilepath($input_filepath)
+				_DecryptSingleFile($gpg_path, $input_filepath, $output_filepath, $password)
+			Next
 		
 		Case $msg = $GUI_EVENT_DROPPED
             For $i = 1 To UBound($DropFilesArr)-1
@@ -82,14 +119,22 @@ Func _GetSpecOutputFilepath($func_input_filepath, $func_specify_folder)
 	Return $func_output_filepath
 EndFunc
 	
-
+;获取解密密码函数
 Func _GetPassword()
 	$func_decrypt_password = InputBox("解密密码", "请输入解密密码", "" ,"*")
 	Return $func_decrypt_password
 EndFunc
-	
-Func _DecryptSingleFile($func_input_filepath, $func_output_filepath, $func_password)
-	Run(@ComSpec & " /c " & 'gpg --passphrase=' & $func_password & ' -o ' & $func_output_filepath & ' -d ' &$func_input_filepath, "", @SW_HIDE)
+
+;使用gpg解密的函数
+Func _DecryptSingleFile($func_gpg_path, $func_input_filepath, $func_output_filepath, $func_password)
+	Run(@ComSpec & " /c " & '""' & $func_gpg_path & '""' & ' --passphrase=' & $func_password & ' -o ' & $func_output_filepath & ' -d ' &$func_input_filepath, "", @SW_HIDE)
+EndFunc
+
+Func _ChooseGpgPath($func_config_file_path)
+	$selected_gpg_path = FileOpenDialog("请选择gpg.exe文件位置", "@ProgramFilesDir", "Gnupg主程序(gpg.exe)|可执行程序(*.exe)", 1 + 2)
+	If $selected_gpg_path <> "" Then
+		IniWrite($func_config_file_path, "batch_decrypt", "gpg_path", $selected_gpg_path)
+	EndIf	
 EndFunc
 
 ;从网上抄了一个拖拽文件到listview中的函数，还需要研究下具体的实现方法
