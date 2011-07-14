@@ -66,9 +66,14 @@ While 1
 		Case $msg = $Menu_configure_exit
 			ExitLoop
 		
-		;点击“设置”按钮后配置gpg文件指向
+		;点击“设置” -- "选择gpg.exe路径"按钮后配置gpg文件指向
 		Case $msg = $Menu_configure_gpgpath
 			_ChooseGpgPath($config_file_path)
+		
+		;点击“帮助”--“关于”按钮后弹出关于信息
+		Case $msg = $Menu_help_about
+			MsgBox(0, "关于", "利用GnuPG来实现批量文件解密的工具" & @CRLF & "希望能帮助您解决一些小麻烦" & @CRLF & "2011 www.knktc.com")
+		
 		
 		;点击“添加”按钮后选择需要解密的文件	
 		Case $msg = $Button_add_file
