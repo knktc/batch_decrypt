@@ -16,7 +16,8 @@ GUIRegisterMsg(0x233, "WM_DROPFILES_FUNC")
 ;“设置”菜单
 $Menu_configure = GUICtrlCreateMenu("设置(&C)")
 $Menu_configure_gpgpath = GUICtrlCreateMenuItem("选择gpg.exe路径", $Menu_configure)
-$Menu_configure_import_keys = GUICtrlCreateMenuItem("导入密钥", $Menu_configure)
+$Menu_configure_import_skr = GUICtrlCreateMenuItem("选择私钥路径", $Menu_configure)
+$Menu_configure_import_pkr = GUICtrlCreateMenuItem("选择公钥路径", $Menu_configure)
 $Menu_configure_separator1 = GUICtrlCreateMenuItem("", $Menu_configure)
 $Menu_configure_exit = GUICtrlCreateMenuItem("退出", $Menu_configure)
 
@@ -53,7 +54,6 @@ while 1
 	EndIf
 WEnd
 
-
 GUISetState()
 
 ;等待接受按键信息
@@ -69,19 +69,32 @@ While 1
 		;点击“设置” -- "选择gpg.exe路径"按钮后配置gpg文件指向
 		Case $msg = $Menu_configure_gpgpath
 			_ChooseGpgPath($config_file_path)
+
+		;在设置中选择私钥地址
+		Case $msg = $Menu_configure_import_skr
+			$choose_skr_path = FileOpenDialog("选择私钥文件", @DesktopDir & "\", "所有文件 (*.*)", 1 + 2)
+			If $choose_skr_path <> "" Then
+				IniWrite($config_file_path, "batch_decrypt", "skr_path", $choose_skr_path)
+			EndIf
+		
+		;在设置中选择公钥地址
+		Case $msg = $Menu_configure_import_pkr
+			$choose_pkr_path = FileOpenDialog("选择私钥文件", @DesktopDir & "\", "所有文件 (*.*)", 1 + 2)
+			If $choose_pkr_path <> "" Then
+				IniWrite($config_file_path, "batch_decrypt", "pkr_path", $choose_pkr_path)
+			EndIf
 		
 		;点击“帮助”--“关于”按钮后弹出关于信息
 		Case $msg = $Menu_help_about
 			MsgBox(0, "关于", "利用GnuPG来实现批量文件解密的工具" & @CRLF & "希望能帮助您解决一些小麻烦" & @CRLF & "2011 www.knktc.com")
 		
-		
 		;点击“添加”按钮后选择需要解密的文件	
 		Case $msg = $Button_add_file
-			$add_file_path = FileOpenDialog("选择加密文件", @DesktopDir & "\", "加密文件 (*.asc; *.pgp) |所有文件 (*.*)", 1 + 2 + 4)
+			$add_file_path = FileOpenDialog("选择加密文件", @DesktopDir & "\", "加密文件 (*.asc; *.pgp) |所有文件 (*.*)", 1 + 2)
 			If $add_file_path <> "" Then
 				GUICtrlCreateListViewItem($add_file_path, $Listview_encrypt_files)
 				GUICtrlSendMsg($Listview_encrypt_files, $LVM_SETCOLUMNWIDTH, 0, -1)
-			EndIf
+			EndIf		
 		
 		;点击删除按钮后删除选中的文件
 		Case $msg = $Button_remove_file
@@ -94,12 +107,14 @@ While 1
 		;点击“解密”按钮后开始解密列表中所有文件
 		Case $msg = $Button_decrypt
 			$password = Call("_GetPassword")		
-			$gpg_path = IniRead($config_file_path, "batch_decrypt", "gpg_path" , "")
+			$gpg_path = IniRead($config_file_path, "batch_decrypt", "gpg_path", "")
+			$skr_path = IniRead($config_file_path, "batch_decrypt", "skr_path", "")
+			$pkr_path = IniRead($config_file_path, "batch_decrypt", "pkr_path", "")
 			$file_count = _GUICtrlListView_GetItemCount($Listview_encrypt_files)
 			For $i = 0 To $file_count-1 
 				$input_filepath = _GUICtrlListView_GetItemText($Listview_encrypt_files, $i)
 				$output_filepath = _GetOutputFilepath($input_filepath)
-				_DecryptSingleFile($gpg_path, $input_filepath, $output_filepath, $password)
+				_DecryptSingleFile($gpg_path, $skr_path, $pkr_path, $input_filepath, $output_filepath, $password)
 			Next
 		
 		Case $msg = $GUI_EVENT_DROPPED
@@ -131,8 +146,8 @@ Func _GetPassword()
 EndFunc
 
 ;使用gpg解密的函数
-Func _DecryptSingleFile($func_gpg_path, $func_input_filepath, $func_output_filepath, $func_password)
-	Run(@ComSpec & " /c " & '""' & $func_gpg_path & '""' & ' --passphrase=' & $func_password & ' -o ' & $func_output_filepath & ' -d ' &$func_input_filepath, "", @SW_HIDE)
+Func _DecryptSingleFile($func_gpg_path, $func_skr_path, $func_pkr_path, $func_input_filepath, $func_output_filepath, $func_password)
+	Run(@ComSpec & " /c " & '""' & $func_gpg_path & '""' & ' --secret-keyring ' & $func_skr_path & ' --keyring ' & $func_pkr_path &' --passphrase=' & $func_password & ' -o ' & $func_output_filepath & ' -d ' &$func_input_filepath, "", @SW_HIDE)
 EndFunc
 
 Func _ChooseGpgPath($func_config_file_path)
