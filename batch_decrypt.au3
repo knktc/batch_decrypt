@@ -147,7 +147,13 @@ EndFunc
 
 ;使用gpg解密的函数
 Func _DecryptSingleFile($func_gpg_path, $func_skr_path, $func_pkr_path, $func_input_filepath, $func_output_filepath, $func_password)
-	Run(@ComSpec & " /c " & '""' & $func_gpg_path & '""' & ' --secret-keyring ' & $func_skr_path & ' --keyring ' & $func_pkr_path &' --passphrase=' & $func_password & ' -o ' & $func_output_filepath & ' -d ' &$func_input_filepath, "", @SW_HIDE)
+	$command = '"' & $func_gpg_path & '"' _
+		     & ' --secret-keyring ' & '"' & $func_skr_path & '"' _ 
+			 &' --keyring ' & '"' & $func_pkr_path & '"' _ 
+			 &' --passphrase=' & $func_password _ 
+			 & ' -o ' & '"' & $func_output_filepath & '"' _ 
+			 & ' -d ' & '"' & $func_input_filepath & '"'
+	Run($command, "", @SW_HIDE)		
 EndFunc
 
 Func _ChooseGpgPath($func_config_file_path)
