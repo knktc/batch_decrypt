@@ -125,9 +125,14 @@ While 1
 	EndSelect
 WEnd
 
-
+;获取输出文件路径的函数
+;使用点号来分隔文件路径，输出除最后一个点号之前的路径
 Func _GetOutputFilepath($func_input_filepath)
-	$func_output_filepath = StringTrimRight($func_input_filepath, 4)
+	$func_path_array = StringSplit($func_input_filepath, ".")
+	Local $length = 0
+	$length = UBound($func_path_array)
+	$length = $length - 2
+	$func_output_filepath = _ArrayToString($func_path_array, ".", 1, $length)
 	Return $func_output_filepath
 EndFunc
 
