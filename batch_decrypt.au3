@@ -10,14 +10,13 @@
 
 Global $DropFilesArr[1]
 
-GUICreate("批量解密工具", 473, 342, -1, -1, -1, $WS_EX_ACCEPTFILES)
+;批量解密主窗口的建立
+$GUI_batch_decrypt = GUICreate("批量解密工具", 473, 342, -1, -1, -1, $WS_EX_ACCEPTFILES)
 GUIRegisterMsg(0x233, "WM_DROPFILES_FUNC")
 
 ;“设置”菜单
 $Menu_configure = GUICtrlCreateMenu("设置(&C)")
-$Menu_configure_gpgpath = GUICtrlCreateMenuItem("选择gpg.exe路径", $Menu_configure)
-$Menu_configure_import_skr = GUICtrlCreateMenuItem("选择私钥路径", $Menu_configure)
-$Menu_configure_import_pkr = GUICtrlCreateMenuItem("选择公钥路径", $Menu_configure)
+$Menu_configure_config = GUICtrlCreateMenuItem("运行设置", $Menu_configure)
 $Menu_configure_separator1 = GUICtrlCreateMenuItem("", $Menu_configure)
 $Menu_configure_exit = GUICtrlCreateMenuItem("退出", $Menu_configure)
 
@@ -39,22 +38,73 @@ $Button_remove_file = GUICtrlCreateButton("删除", 141, 267, 75, 23)
 $Button_remove_all = GUICtrlCreateButton("清空", 249, 267, 75, 23)
 $Button_decrypt = GUICtrlCreateButton("解密", 369, 267, 75, 23)
 
+;配置窗口的建立
+$GUI_config_window = GUICreate("设置", 386, 224, -1, -1, $WS_DLGFRAME, $WS_EX_ACCEPTFILES, $GUI_batch_decrypt)
+
+;Select gpg.exe path
+$Label_select_gpg_path = GUICtrlCreateLabel("选择gpg.exe路径", 12, 26)
+;GUICtrlSetColor($Label_select_gpg_path, 0xff0000)
+$Input_gpgpath = GUICtrlCreateInput("", 12, 40, 276, 21)
+GUICtrlSetState($Input_gpgpath, $GUI_DROPACCEPTED)
+$Button_browse_gpgpath = GUICtrlCreateButton("浏览...", 296, 38, 75, 23)
+
+;Select secret ring path
+$Label_select_secring_path = GUICtrlCreateLabel("选择私钥路径", 12, 72)
+$Input_secringpath = GUICtrlCreateInput("", 12, 86, 276, 21)
+GUICtrlSetState($Input_secringpath, $GUI_DROPACCEPTED)
+$Button_browse_secringpath = GUICtrlCreateButton("浏览...", 296, 84, 75, 23)
+
+;Select public ring path
+$Label_select_pubring_path = GUICtrlCreateLabel("选择公钥路径", 12, 118)
+$Input_pubringpath = GUICtrlCreateInput("", 12, 132, 276, 21)
+GUICtrlSetState($Input_pubringpath, $GUI_DROPACCEPTED)
+$Button_browse_pubringpath = GUICtrlCreateButton("浏览...", 296, 130, 75, 23)
+
+;ok and cancel
+$Button_config_ok = GUICtrlCreateButton("确定", 213, 177, 75, 23)
+$Button_config_cancel = GUICtrlCreateButton("取消", 296, 177, 75, 23)
+
+
 ;配置文件路径
 $config_file_path = @WorkingDir & "\configure.ini"
 
-;启动时检查是否有配置文件，是否已指定gpg.exe的位置
-while 1	
+;启动时检查是否有配置文件
+;如果没有配置文件存在则弹出设置窗口要求用户进行第一次设置
+while 1
 	If FileExists($config_file_path) = 0 Then
-		_FileCreate($config_file_path)
-		_ChooseGpgPath($config_file_path)
-	ElseIf IniRead($config_file_path, "batch_decrypt", "gpg_path" , "") = "" Then
-		_ChooseGpgPath($config_file_path)
+		_FileCreate($config_file_path)				
+		While 1
+			$startup_msg = GUIGetMsg()
+		GUISetState(@SW_SHOW, $GUI_config_window)
+		Select
+			Case $startup_msg = $Button_config_ok
+				_GetAndWriteConfig($Input_gpgpath, $Input_secringpath, $Input_pubringpath, $config_file_path)
+				GUISetState(@SW_HIDE, $GUI_config_window)
+				ExitLoop
+			
+			Case $startup_msg = $Button_config_cancel
+				GUISetState(@SW_HIDE, $GUI_config_window)
+				ExitLoop
+				
+			;在设置中选择gpg.exe的地址
+			Case $startup_msg = $Button_browse_gpgpath
+				_BrowseGpgPath($Input_gpgpath)
+
+			;在设置中选择私钥地址
+			Case $startup_msg = $Button_browse_secringpath
+				_BrowseSkrPath($Input_secringpath)
+		
+			;在设置中选择公钥地址
+			Case $startup_msg = $Button_browse_pubringpath
+				_BrowsePkrPath($Input_pubringpath)			
+		EndSelect
+		WEnd
 	Else
-		ExitLoop
+		ExitLoop		
 	EndIf
 WEnd
 
-GUISetState()
+GUISetState(@SW_SHOW, $GUI_batch_decrypt)
 
 ;等待接受按键信息
 While 1
@@ -63,26 +113,39 @@ While 1
 		;接收关闭信息
 		Case $msg = $GUI_EVENT_CLOSE
 			ExitLoop
+		
+		;点击“设置”--“运行设置”后弹出设置窗口
+		Case $msg = $Menu_configure_config
+			GUISetState(@SW_DISABLE, $GUI_batch_decrypt)
+			GUISetState(@SW_SHOW, $GUI_config_window)
+			_GetAndSetInput($config_file_path, $Input_gpgpath, $Input_secringpath, $Input_pubringpath)
+		
+		;点击设置窗口中的确定按钮后进行的操作
+		Case $msg = $Button_config_ok
+			_GetAndWriteConfig($Input_gpgpath, $Input_secringpath, $Input_pubringpath, $config_file_path)
+			GUISetState(@SW_ENABLE, $GUI_batch_decrypt)
+			GUISetState(@SW_HIDE, $GUI_config_window)
+		
+		;点击设置窗口中的取消按钮后进行的操作
+		Case $msg = $Button_config_cancel
+			GUISetState(@SW_ENABLE, $GUI_batch_decrypt)
+			GUISetState(@SW_HIDE, $GUI_config_window)
+		
+		;按菜单中的退出按钮退出程序运行	
 		Case $msg = $Menu_configure_exit
 			ExitLoop
 		
-		;点击“设置” -- "选择gpg.exe路径"按钮后配置gpg文件指向
-		Case $msg = $Menu_configure_gpgpath
-			_ChooseGpgPath($config_file_path)
+		;在设置中选择gpg.exe的地址
+		Case $msg = $Button_browse_gpgpath
+			_BrowseGpgPath($Input_gpgpath)
 
 		;在设置中选择私钥地址
-		Case $msg = $Menu_configure_import_skr
-			$choose_skr_path = FileOpenDialog("选择私钥文件", @DesktopDir & "\", "所有文件 (*.*)", 1 + 2)
-			If $choose_skr_path <> "" Then
-				IniWrite($config_file_path, "batch_decrypt", "skr_path", $choose_skr_path)
-			EndIf
+		Case $msg = $Button_browse_secringpath
+			_BrowseSkrPath($Input_secringpath)
 		
 		;在设置中选择公钥地址
-		Case $msg = $Menu_configure_import_pkr
-			$choose_pkr_path = FileOpenDialog("选择私钥文件", @DesktopDir & "\", "所有文件 (*.*)", 1 + 2)
-			If $choose_pkr_path <> "" Then
-				IniWrite($config_file_path, "batch_decrypt", "pkr_path", $choose_pkr_path)
-			EndIf
+		Case $msg = $Button_browse_pubringpath
+			_BrowsePkrPath($Input_pubringpath)
 		
 		;点击“帮助”--“关于”按钮后弹出关于信息
 		Case $msg = $Menu_help_about
@@ -98,12 +161,12 @@ While 1
 		
 		;点击删除按钮后删除选中的文件
 		Case $msg = $Button_remove_file
-			_GUICtrlListView_DeleteItemsSelected($Listview_encrypt_files)	
+			_GUICtrlListView_DeleteItemsSelected($Listview_encrypt_files)
 		
 		;点击清空按钮后删除listview中所有的文件
 		Case $msg = $Button_remove_all
 			_GUICtrlListView_DeleteAllItems($Listview_encrypt_files)
-		
+
 		;点击“解密”按钮后开始解密列表中所有文件
 		Case $msg = $Button_decrypt
 			$password = Call("_GetPassword")		
@@ -144,13 +207,13 @@ Func _GetSpecOutputFilepath($func_input_filepath, $func_specify_folder)
 	Return $func_output_filepath
 EndFunc
 	
-;获取解密密码函数
+;获取解密密码函数、
 Func _GetPassword()
 	$func_decrypt_password = InputBox("解密密码", "请输入解密密码", "" ,"*")
 	Return $func_decrypt_password
 EndFunc
 
-;使用gpg解密的函数
+;使用gpg解密单个文件的函数
 Func _DecryptSingleFile($func_gpg_path, $func_skr_path, $func_pkr_path, $func_input_filepath, $func_output_filepath, $func_password)
 	$command = '"' & $func_gpg_path & '"' _
 		     & ' --secret-keyring ' & '"' & $func_skr_path & '"' _ 
@@ -161,12 +224,33 @@ Func _DecryptSingleFile($func_gpg_path, $func_skr_path, $func_pkr_path, $func_in
 	Run($command, "", @SW_HIDE)		
 EndFunc
 
-Func _ChooseGpgPath($func_config_file_path)
+;浏览gpg.exe文件，并将选择的路径写入到路径输入框中
+Func _BrowseGpgPath($func_input_gpgpath)
 	$selected_gpg_path = FileOpenDialog("请选择gpg.exe文件位置", "@ProgramFilesDir", "Gnupg主程序(gpg.exe)|可执行程序(*.exe)", 1 + 2)
-	If $selected_gpg_path <> "" Then
-		IniWrite($func_config_file_path, "batch_decrypt", "gpg_path", $selected_gpg_path)
-	EndIf	
+	GUICtrlSetData($func_input_gpgpath, $selected_gpg_path)
 EndFunc
+
+;浏览私钥文件，并将选择的路径写入到路径输入框中
+Func _BrowseSkrPath($func_input_secringpath)
+	$selected_skr_path = FileOpenDialog("选择私钥文件", @DesktopDir & "\", "所有文件 (*.*)", 1 + 2)
+	GUICtrlSetData($func_input_secringpath, $selected_skr_path)
+EndFunc
+
+;浏览公钥文件，并将选择的路径写入到路径输入框中
+Func _BrowsePkrPath($func_input_pubringpath)
+	$selected_pkr_path = FileOpenDialog("选择公钥文件", @DesktopDir & "\", "所有文件 (*.*)", 1 + 2)
+	GUICtrlSetData($func_input_pubringpath, $selected_pkr_path)
+EndFunc
+
+;读取输入框中的数据并将数据写入到配置文件中的函数
+Func _GetAndWriteConfig($func_input_gpgpath, $func_input_secringpath, $func_input_pubringpath, $func_config_file_path)
+	Local $func_gpgpath = GUICtrlRead($func_input_gpgpath)
+	Local $func_secringpath = GUICtrlRead($func_input_secringpath)
+	Local $func_pubringpath = GUICtrlRead($func_input_pubringpath)
+	IniWrite($func_config_file_path, "batch_decrypt", "gpg_path", $func_gpgpath)
+	IniWrite($func_config_file_path, "batch_decrypt", "skr_path", $func_secringpath)
+	IniWrite($func_config_file_path, "batch_decrypt", "pkr_path", $func_pubringpath)
+EndFunc	
 
 ;从网上抄了一个拖拽文件到listview中的函数，还需要研究下具体的实现方法
 Func WM_DROPFILES_FUNC($hWnd, $msgID, $wParam, $lParam)
@@ -184,4 +268,13 @@ Func WM_DROPFILES_FUNC($hWnd, $msgID, $wParam, $lParam)
     Next
     $DropFilesArr[0] = UBound($DropFilesArr)-1
 EndFunc
-		
+
+;用于读取配置文件中的配置信息并将信息显示到配置窗口相关输入框中的函数
+Func _GetAndSetInput($func_config_file_path, $func_input_gpgpath, $func_input_secringpath, $func_input_pubringpath)
+	$func_gpg_path = IniRead($func_config_file_path, "batch_decrypt", "gpg_path", "")
+	GUICtrlSetData($func_input_gpgpath, $func_gpg_path)
+	$func_skr_path = IniRead($func_config_file_path, "batch_decrypt", "skr_path", "")
+	GUICtrlSetData($func_input_secringpath, $func_skr_path)
+	$func_pkr_path = IniRead($func_config_file_path, "batch_decrypt", "pkr_path", "")
+	GUICtrlSetData($func_input_pubringpath, $func_pkr_path)
+EndFunc
