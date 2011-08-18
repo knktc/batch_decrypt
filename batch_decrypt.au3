@@ -29,9 +29,12 @@ $Listview_encrypt_files = GUICtrlCreateListView("解密文件", 11, 33, 446, 150, -1
 GUICtrlSendMsg(-1, $LVM_SETEXTENDEDLISTVIEWSTYLE, $LVS_EX_HEADERDRAGDROP, $LVS_EX_HEADERDRAGDROP)
 GUICtrlSetState(-1, $GUI_DROPACCEPTED)
 
+;指定输出文件夹
 GUICtrlCreateLabel("选择输出文件夹", 20, 189)
-$Editbox_output_folder = GUICtrlCreateEdit("", 11, 208, 408, 23, 0x1000 + $ES_AUTOHSCROLL)
-GUICtrlCreateLabel("如不指定输出文件夹，则解密后文件存储于加密文件相同目录下", 20, 241)
+$Editbox_output_folder = GUICtrlCreateInput("", 11, 208, 286, 22)
+$Button_browse_output_folder = GUICtrlCreateButton("浏览...", 304, 207, 75, 23)
+$Button_default_output_folder = GUICtrlCreateButton("默认", 384, 207, 75, 23)
+GUICtrlCreateLabel("提示：默认无需指定输出文件夹，解密后的文件存储于加密文件相同目录下", 20, 241)
 
 $Button_add_file = GUICtrlCreateButton("添加", 23, 267, 75, 23)
 $Button_remove_file = GUICtrlCreateButton("删除", 141, 267, 75, 23)
@@ -166,6 +169,14 @@ While 1
 		;点击清空按钮后删除listview中所有的文件
 		Case $msg = $Button_remove_all
 			_GUICtrlListView_DeleteAllItems($Listview_encrypt_files)
+		
+		;点击浏览按钮后开始选择解密文件输出文件夹
+		Case $msg = $Button_browse_output_folder
+			$selected_output_folder = FileSelectFolder("请选择解密文件输出文件夹", "", 1 + 4)
+			GUICtrlSetData($Editbox_output_folder, $selected_output_folder)
+		;点击默认按钮后将解密文件输出文件夹输入框中的内容清空
+		Case $msg = $Button_default_output_folder
+			GUICtrlSetData($Editbox_output_folder, "")
 
 		;点击“解密”按钮后开始解密列表中所有文件
 		Case $msg = $Button_decrypt
@@ -176,7 +187,14 @@ While 1
 			$file_count = _GUICtrlListView_GetItemCount($Listview_encrypt_files)
 			For $i = 0 To $file_count-1 
 				$input_filepath = _GUICtrlListView_GetItemText($Listview_encrypt_files, $i)
-				$output_filepath = _GetOutputFilepath($input_filepath)
+				
+				$SpecOutputFilepath = ""
+				$SpecOutputFilepath = GUICtrlRead($Editbox_output_folder)
+				If($SpecOutputFilepath = "") Then
+					$output_filepath = _GetOutputFilepath($input_filepath)
+				Else
+					$output_filepath = _GetSpecOutputFilepath($input_filepath, $SpecOutputFilepath)
+				EndIf
 				_DecryptSingleFile($gpg_path, $skr_path, $pkr_path, $input_filepath, $output_filepath, $password)
 			Next
 		
@@ -199,7 +217,9 @@ Func _GetOutputFilepath($func_input_filepath)
 	Return $func_output_filepath
 EndFunc
 
+;获取指定的解密文件输出目录的函数
 Func _GetSpecOutputFilepath($func_input_filepath, $func_specify_folder)
+	$func_input_filepath = _GetOutputFilepath($func_input_filepath)
 	$split_filepath_array = StringSplit($func_input_filepath, "\", 1)
 	$split_array_count = $split_filepath_array[0]
 	$func_filename = $split_filepath_array[$split_array_count]
